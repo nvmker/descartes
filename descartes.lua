@@ -67,7 +67,9 @@ function init()
   params:add{type = "number", id = "xMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add_separator("xClockDiv", "clock division")
   params:add{type = "number", id = "xClockNum", name = "numerator", min = 1, max = 8, default = 1}
+  params:set_action("xClockNum", function() saveData() end)
   params:add{type = "number", id = "xClockDen", name = "denominator", min=1, max=16, default = 1}
+  params:set_action("xClockDen", function() saveData() end)
 
 
   params:add_group("y layer",10)
@@ -80,7 +82,9 @@ function init()
   params:add{type = "number", id = "yMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add_separator("yClockDiv", "clock division")
   params:add{type = "number", id = "yClockNum", name = "numerator", min = 1, max = 8, default = 1}
+  params:set_action("yClockNum", function() saveData() end)
   params:add{type = "number", id = "yClockDen", name = "denominator", min=1, max=16, default = 1}
+  params:set_action("yClockDen", function() saveData() end)
 
 
   params:add_group("c layer",5)
