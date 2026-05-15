@@ -56,7 +56,47 @@ function initTable(size, value)
   return t
 end
 
+function connectMidiIn(port)
+  midi_in = midi.connect(port)
+  midi_in.event = function(data)
+    local msg = midi.to_msg(data)
+    if msg.type == 'note_on' and editNote >= 1 and params:get("midiNoteInput") == 2 then
+      local l = displayLayer
+      if #quantScale[l] > 0 then
+        local maxNote = quantScale[l][#quantScale[l]]
+        -- map incoming midi note into quantizer range (0 to maxNote)
+        local midiNote = msg.note - 24
+        if midiNote > maxNote then midiNote = maxNote end
+        if midiNote < 0 then midiNote = 0 end
+        -- find closest note in quantScale
+        local closest = quantScale[l][1]
+        local leastDiff = math.abs(quantScale[l][1] - midiNote)
+        for i=2,#quantScale[l] do
+          local diff = math.abs(quantScale[l][i] - midiNote)
+          if diff < leastDiff then
+            leastDiff = diff
+            closest = quantScale[l][i]
+          end
+        end
+        -- reverse map to percentage
+        if maxNote > 0 then
+          noteValue[l][editNote] = util.clamp((closest / maxNote) * 100, 0, 100)
+        end
+        updateQuantizedNotes(l)
+        grid_redraw()
+        redraw()
+        saveData()
+      end
+    end
+  end
+end
+
 function init()
+  params:add_group("midi input",2)
+  params:add{type = "number", id = "midiInPort", name = "midi in port", min = 1, max = 16, default = 2}
+  params:set_action("midiInPort", function(x) connectMidiIn(x) end)
+  params:add{type = "option", id = "midiNoteInput", name = "note input", options = {"off", "on"}, default = 1}
+
   params:add_group("x layer",12)
   params:add{type = "option", id = "xClock", name = "clock source", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 1}
   params:add{type = "option", id = "xResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
@@ -136,6 +176,7 @@ function init()
   
   loadData()
   midi_out = midi.connect(1)
+  connectMidiIn(params:get("midiInPort"))
   
   clock.run(stepXClock)
   clock.run(stepYClock)
