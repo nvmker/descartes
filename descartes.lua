@@ -57,7 +57,7 @@ function initTable(size, value)
 end
 
 function init()
-  params:add_group("x layer",10)
+  params:add_group("x layer",12)
   params:add{type = "option", id = "xClock", name = "clock source", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 1}
   params:add{type = "option", id = "xResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
   params:add{type = "option", id = "xStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=1}
@@ -70,9 +70,12 @@ function init()
   params:set_action("xClockNum", function() saveData() end)
   params:add{type = "number", id = "xClockDen", name = "denominator", min=1, max=16, default = 1}
   params:set_action("xClockDen", function() saveData() end)
+  params:add_separator("xSnakeSep", "snake")
+  params:add{type = "number", id = "xSnake", name = "snake pattern", min = 1, max = 16, default = 1}
+  params:set_action("xSnake", function(x) snake[1] = x; saveData(); grid_redraw(); redraw() end)
 
 
-  params:add_group("y layer",10)
+  params:add_group("y layer",12)
   params:add{type = "option", id = "yClock", name = "clock", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 2}
   params:add{type = "option", id = "yResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
   params:add{type = "option", id = "yStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=3}
@@ -85,6 +88,9 @@ function init()
   params:set_action("yClockNum", function() saveData() end)
   params:add{type = "number", id = "yClockDen", name = "denominator", min=1, max=16, default = 1}
   params:set_action("yClockDen", function() saveData() end)
+  params:add_separator("ySnakeSep", "snake")
+  params:add{type = "number", id = "ySnake", name = "snake pattern", min = 1, max = 16, default = 1}
+  params:set_action("ySnake", function(x) snake[2] = x; saveData(); grid_redraw(); redraw() end)
 
 
   params:add_group("c layer",5)
