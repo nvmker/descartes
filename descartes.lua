@@ -283,8 +283,8 @@ function advance(inputNum, rising)
   
   -- C
   if rising then
-    cRow = math.floor(step[3] / 4) -- 0,1,2, or 3
-    cCol = ((step[3]) % 4)+1 -- 1,2,3,4
+    cRow = math.floor((step[3]-1) / 4) -- 0,1,2, or 3
+    cCol = ((step[3]-1) % 4)+1 -- 1,2,3,4
 
     -- C
     if (inputNum == 1) then
