@@ -43,6 +43,7 @@ local step = {1, 1, 1}
 local snake = {1, 1}
 local displayLayer = 1
 local cGateOpen = {false, false}
+local transportRunning = false
 
 local midiVelParam = {"midiVelX", "midiVelY"}
 local midiChanParam = {"midiChanX", "midiChanY"}
@@ -56,26 +57,28 @@ function initTable(size, value)
 end
 
 function init()
-  params:add_group("x layer",9)
-  params:add{type = "option", id = "xClock", name = "clock source", options = {"crow input 1", "crow input 2", "internal clock"}, default = 1}
+  params:add_group("x layer",10)
+  params:add{type = "option", id = "xClock", name = "clock source", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 1}
+  params:add{type = "option", id = "xResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
   params:add{type = "option", id = "xStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=1}
   params:add{type = "option", id = "xGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=2}
   params:add{type = "number", id = "midiChanX", name = "midi channel", min = 1, max = 16, default = 1}
   params:add{type = "number", id = "midiVelX", name = "midi velocity", min = 1, max = 127, default = 100}
   params:add{type = "number", id = "xMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
-  params:add_separator("xClockDiv", "internal clock division")
+  params:add_separator("xClockDiv", "clock division")
   params:add{type = "number", id = "xClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:add{type = "number", id = "xClockDen", name = "denominator", min=1, max=16, default = 1}
 
 
-  params:add_group("y layer",9)
-  params:add{type = "option", id = "yClock", name = "clock", options = {"crow input 1", "crow input 2", "internal clock"}, default = 2}
+  params:add_group("y layer",10)
+  params:add{type = "option", id = "yClock", name = "clock", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 2}
+  params:add{type = "option", id = "yResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
   params:add{type = "option", id = "yStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=3}
   params:add{type = "option", id = "yGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=4}
   params:add{type = "number", id = "midiChanY", name = "midi channel", min = 1, max = 16, default = 2}
   params:add{type = "number", id = "midiVelY", name = "midi velocity", min = 1, max = 127, default = 100}
   params:add{type = "number", id = "yMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
-  params:add_separator("yClockDiv", "internal clock division")
+  params:add_separator("yClockDiv", "clock division")
   params:add{type = "number", id = "yClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:add{type = "number", id = "yClockDen", name = "denominator", min=1, max=16, default = 1}
 
@@ -148,6 +151,43 @@ function init()
   end
   crow.input[2].mode("change", 2.0, .25, "both")
   
+  clock.transport.start = function()
+    transportRunning = true
+    if params:get("xResetOnStart") == 2 then
+      stepBase[1] = 1
+      step[1] = 1
+    end
+    if params:get("yResetOnStart") == 2 then
+      stepBase[2] = 1
+      step[2] = 1
+    end
+    if params:get("xResetOnStart") == 2 or params:get("yResetOnStart") == 2 then
+      step[3] = 1
+      grid_redraw()
+      redraw()
+    end
+  end
+  
+  clock.transport.stop = function()
+    transportRunning = false
+    -- silence layers using global clock
+    if params:get("xClock") == 4 then
+      if params:get("xGate") < 5 then crow.output[params:get("xGate")].volts = 0 end
+      local mn = quantizedNotes[1][step[1]] + 24 + getMidiOffset(1)
+      midi_out:note_off(mn, params:get("midiVelX"), params:get("midiChanX"))
+    end
+    if params:get("yClock") == 4 then
+      if params:get("yGate") < 5 then crow.output[params:get("yGate")].volts = 0 end
+      local mn = quantizedNotes[2][step[2]] + 24 + getMidiOffset(2)
+      midi_out:note_off(mn, params:get("midiVelY"), params:get("midiChanY"))
+    end
+    if params:get("xClock") == 4 or params:get("yClock") == 4 then
+      if params:get("cGate") < 5 then crow.output[params:get("cGate")].volts = 0 end
+      local mn = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
+      midi_out:note_off(mn, params:get("midiVelC"), params:get("midiChanC"))
+    end
+  end
+  
   grid_redraw()
   redraw()
 end
@@ -155,11 +195,11 @@ end
 
 function stepXClock()
   while true do
-    if (params:get("xClock") == 3) then
+    if (params:get("xClock") == 3) or (params:get("xClock") == 4 and transportRunning) then
       advance(1, true)
     end
     clock.sync(params:get("xClockDen")/(params:get("xClockNum")*2))
-    if (params:get("xClock") == 3) then
+    if (params:get("xClock") == 3) or (params:get("xClock") == 4 and transportRunning) then
       advance(1, false)
     end
     clock.sync(params:get("xClockDen")/(params:get("xClockNum")*2))
@@ -168,11 +208,11 @@ end
 
 function stepYClock()
   while true do
-    if (params:get("yClock") == 3) then
+    if (params:get("yClock") == 3) or (params:get("yClock") == 4 and transportRunning) then
       advance(2, true)
     end
     clock.sync(params:get("yClockDen")/(params:get("yClockNum")*2))
-    if (params:get("yClock") == 3) then
+    if (params:get("yClock") == 3) or (params:get("yClock") == 4 and transportRunning) then
       advance(2, false)
     end
     clock.sync(params:get("yClockDen")/(params:get("yClockNum")*2))
