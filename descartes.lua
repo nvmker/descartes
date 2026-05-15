@@ -321,8 +321,10 @@ function advance(inputNum, rising)
         cGateOpen[inputNum] = true
       end
     end
-    midiNote = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
-    midi_out:note_on(midiNote, params:get("midiVelC"), params:get("midiChanC"))
+    if (gate[3][step[3]]) then
+      midiNote = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
+      midi_out:note_on(midiNote, params:get("midiVelC"), params:get("midiChanC"))
+    end
     
     -- X and Y
     if (accessIsBlank(inputNum)) then
@@ -353,8 +355,10 @@ function advance(inputNum, rising)
         crow.output[gateOut].volts = 5
       end
     end
-    midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
-    midi_out:note_on(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+    if (gate[inputNum][step[inputNum]]) then
+      midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
+      midi_out:note_on(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+    end
 
   else
     if gateOut < 5 then
@@ -364,8 +368,14 @@ function advance(inputNum, rising)
       crow.output[params:get("cGate")].volts = 0
       cGateOpen[inputNum] = false
     end
-    midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
-    midi_out:note_off(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+    if (gate[inputNum][step[inputNum]]) then
+      midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
+      midi_out:note_off(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+    end
+    if (gate[3][step[3]]) then
+      midiNote = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
+      midi_out:note_off(midiNote, params:get("midiVelC"), params:get("midiChanC"))
+    end
   end
   grid_redraw()
   redraw()
