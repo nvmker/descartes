@@ -109,7 +109,7 @@ function init()
   params:add{type = "number", id = "xMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add{type = "option", id = "xMidiOverlap", name = "midi glide mode", options = {"off", "overlap", "tie"}, default = 1}
   params:add{type = "option", id = "xCrowGlide", name = "crow glide mode", options = {"glide", "tie"}, default = 1}
-  params:add{type = "option", id = "xCrowTie", name = "crow tie mode", options = {"with pitch", "with pitch and slew", "without pitch"}, default = 1}
+  params:add{type = "option", id = "xCrowTie", name = "crow tie mode", options = {"pitch", "pitch/slew", "w/o pitch"}, default = 1}
   params:add_separator("xClockDiv", "clock division")
   params:add{type = "number", id = "xClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:set_action("xClockNum", function() saveData() end)
@@ -130,7 +130,7 @@ function init()
   params:add{type = "number", id = "yMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add{type = "option", id = "yMidiOverlap", name = "midi glide mode", options = {"off", "overlap", "tie"}, default = 1}
   params:add{type = "option", id = "yCrowGlide", name = "crow glide mode", options = {"glide", "tie"}, default = 1}
-  params:add{type = "option", id = "yCrowTie", name = "crow tie mode", options = {"with pitch", "with pitch and slew", "without pitch"}, default = 1}
+  params:add{type = "option", id = "yCrowTie", name = "crow tie mode", options = {"pitch", "pitch/slew", "w/o pitch"}, default = 1}
   params:add_separator("yClockDiv", "clock division")
   params:add{type = "number", id = "yClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:set_action("yClockNum", function() saveData() end)
@@ -149,7 +149,7 @@ function init()
   params:add{type = "number", id = "cMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add{type = "option", id = "cMidiOverlap", name = "midi glide mode", options = {"off", "overlap", "tie"}, default = 1}
   params:add{type = "option", id = "cCrowGlide", name = "crow glide mode", options = {"glide", "tie"}, default = 1}
-  params:add{type = "option", id = "cCrowTie", name = "crow tie mode", options = {"with pitch", "with pitch and slew", "without pitch"}, default = 1}
+  params:add{type = "option", id = "cCrowTie", name = "crow tie mode", options = {"pitch", "pitch/slew", "w/o pitch"}, default = 1}
 
   quant = {
     initTable(12, true),
