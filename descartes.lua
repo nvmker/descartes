@@ -292,7 +292,7 @@ end
 
 
 function advance(inputNum, rising)
-  l = activeLayer
+  l = displayLayer
   if (inputNum == 1) then
     stepOut = params:get("xStep")
     gateOut = params:get("xGate")
@@ -444,17 +444,15 @@ function advance(inputNum, rising)
     local overlapParam = inputNum == 1 and "xMidiOverlap" or "yMidiOverlap"
     local mode = params:get(overlapParam)
     if not ((mode == 2 or mode == 3) and glide[inputNum][step[inputNum]]) then
-      if (gate[inputNum][step[inputNum]]) then
-        midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
-        midi_out:note_off(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+      if prevMidiNote[inputNum] then
+        midi_out:note_off(prevMidiNote[inputNum], params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
       end
       prevMidiNote[inputNum] = nil
     end
     local cMode = params:get("cMidiOverlap")
     if not ((cMode == 2 or cMode == 3) and glide[3][step[3]]) then
-      if (gate[3][step[3]]) then
-        midiNote = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
-        midi_out:note_off(midiNote, params:get("midiVelC"), params:get("midiChanC"))
+      if prevMidiNote[3] then
+        midi_out:note_off(prevMidiNote[3], params:get("midiVelC"), params:get("midiChanC"))
       end
       prevMidiNote[3] = nil
     end
