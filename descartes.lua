@@ -47,6 +47,8 @@ local transportRunning = false
 
 local midiVelParam = {"midiVelX", "midiVelY"}
 local midiChanParam = {"midiChanX", "midiChanY"}
+local prevMidiNote = {nil, nil, nil}
+local MIDI_OVERLAP_TIME = 0.01
 
 function initTable(size, value)
   t = {}
@@ -97,7 +99,7 @@ function init()
   params:set_action("midiInPort", function(x) connectMidiIn(x) end)
   params:add{type = "option", id = "midiNoteInput", name = "note input", options = {"off", "on"}, default = 1}
 
-  params:add_group("x layer",12)
+  params:add_group("x layer",13)
   params:add{type = "option", id = "xClock", name = "clock source", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 1}
   params:add{type = "option", id = "xResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
   params:add{type = "option", id = "xStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=1}
@@ -105,6 +107,7 @@ function init()
   params:add{type = "number", id = "midiChanX", name = "midi channel", min = 1, max = 16, default = 1}
   params:add{type = "number", id = "midiVelX", name = "midi velocity", min = 1, max = 127, default = 100}
   params:add{type = "number", id = "xMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
+  params:add{type = "option", id = "xMidiOverlap", name = "midi glide overlap", options = {"off", "on"}, default = 1}
   params:add_separator("xClockDiv", "clock division")
   params:add{type = "number", id = "xClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:set_action("xClockNum", function() saveData() end)
@@ -115,7 +118,7 @@ function init()
   params:set_action("xSnake", function(x) snake[1] = x; saveData(); grid_redraw(); redraw() end)
 
 
-  params:add_group("y layer",12)
+  params:add_group("y layer",13)
   params:add{type = "option", id = "yClock", name = "clock", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 2}
   params:add{type = "option", id = "yResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
   params:add{type = "option", id = "yStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=3}
@@ -123,6 +126,7 @@ function init()
   params:add{type = "number", id = "midiChanY", name = "midi channel", min = 1, max = 16, default = 2}
   params:add{type = "number", id = "midiVelY", name = "midi velocity", min = 1, max = 127, default = 100}
   params:add{type = "number", id = "yMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
+  params:add{type = "option", id = "yMidiOverlap", name = "midi glide overlap", options = {"off", "on"}, default = 1}
   params:add_separator("yClockDiv", "clock division")
   params:add{type = "number", id = "yClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:set_action("yClockNum", function() saveData() end)
@@ -224,18 +228,33 @@ function init()
     -- silence layers using global clock
     if params:get("xClock") == 4 then
       if params:get("xGate") < 5 then crow.output[params:get("xGate")].volts = 0 end
-      local mn = quantizedNotes[1][step[1]] + 24 + getMidiOffset(1)
-      midi_out:note_off(mn, params:get("midiVelX"), params:get("midiChanX"))
+      if prevMidiNote[1] then
+        midi_out:note_off(prevMidiNote[1], params:get("midiVelX"), params:get("midiChanX"))
+        prevMidiNote[1] = nil
+      else
+        local mn = quantizedNotes[1][step[1]] + 24 + getMidiOffset(1)
+        midi_out:note_off(mn, params:get("midiVelX"), params:get("midiChanX"))
+      end
     end
     if params:get("yClock") == 4 then
       if params:get("yGate") < 5 then crow.output[params:get("yGate")].volts = 0 end
-      local mn = quantizedNotes[2][step[2]] + 24 + getMidiOffset(2)
-      midi_out:note_off(mn, params:get("midiVelY"), params:get("midiChanY"))
+      if prevMidiNote[2] then
+        midi_out:note_off(prevMidiNote[2], params:get("midiVelY"), params:get("midiChanY"))
+        prevMidiNote[2] = nil
+      else
+        local mn = quantizedNotes[2][step[2]] + 24 + getMidiOffset(2)
+        midi_out:note_off(mn, params:get("midiVelY"), params:get("midiChanY"))
+      end
     end
     if params:get("xClock") == 4 or params:get("yClock") == 4 then
       if params:get("cGate") < 5 then crow.output[params:get("cGate")].volts = 0 end
-      local mn = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
-      midi_out:note_off(mn, params:get("midiVelC"), params:get("midiChanC"))
+      if prevMidiNote[3] then
+        midi_out:note_off(prevMidiNote[3], params:get("midiVelC"), params:get("midiChanC"))
+        prevMidiNote[3] = nil
+      else
+        local mn = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
+        midi_out:note_off(mn, params:get("midiVelC"), params:get("midiChanC"))
+      end
     end
   end
   
@@ -357,7 +376,31 @@ function advance(inputNum, rising)
     end
     if (gate[inputNum][step[inputNum]]) then
       midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
-      midi_out:note_on(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+      local overlapParam = inputNum == 1 and "xMidiOverlap" or "yMidiOverlap"
+      if params:get(overlapParam) == 2 and glide[inputNum][step[inputNum]] and prevMidiNote[inputNum] and prevMidiNote[inputNum] ~= midiNote then
+        -- midi glide overlap: new note on, then delayed old note off
+        midi_out:note_on(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+        local oldNote = prevMidiNote[inputNum]
+        local vel = params:get(midiVelParam[inputNum])
+        local chan = params:get(midiChanParam[inputNum])
+        clock.run(function()
+          clock.sleep(MIDI_OVERLAP_TIME)
+          midi_out:note_off(oldNote, vel, chan)
+        end)
+      else
+        -- normal: turn off any lingering note from overlap, then new note on
+        if prevMidiNote[inputNum] and prevMidiNote[inputNum] ~= midiNote then
+          midi_out:note_off(prevMidiNote[inputNum], params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+        end
+        midi_out:note_on(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+      end
+      prevMidiNote[inputNum] = midiNote
+    else
+      -- gate off: clean up any lingering note from deferred overlap
+      if prevMidiNote[inputNum] then
+        midi_out:note_off(prevMidiNote[inputNum], 0, params:get(midiChanParam[inputNum]))
+        prevMidiNote[inputNum] = nil
+      end
     end
 
   else
@@ -368,9 +411,13 @@ function advance(inputNum, rising)
       crow.output[params:get("cGate")].volts = 0
       cGateOpen[inputNum] = false
     end
-    if (gate[inputNum][step[inputNum]]) then
-      midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
-      midi_out:note_off(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+    local overlapParam = inputNum == 1 and "xMidiOverlap" or "yMidiOverlap"
+    if not (params:get(overlapParam) == 2 and glide[inputNum][step[inputNum]]) then
+      if (gate[inputNum][step[inputNum]]) then
+        midiNote = quantizedNotes[inputNum][step[inputNum]] + 24 + getMidiOffset(inputNum)
+        midi_out:note_off(midiNote, params:get(midiVelParam[inputNum]), params:get(midiChanParam[inputNum]))
+      end
+      prevMidiNote[inputNum] = nil
     end
     if (gate[3][step[3]]) then
       midiNote = quantizedNotes[3][step[3]] + 24 + getMidiOffset(3)
