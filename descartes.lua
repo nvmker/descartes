@@ -99,7 +99,7 @@ function init()
   params:set_action("midiInPort", function(x) connectMidiIn(x) end)
   params:add{type = "option", id = "midiNoteInput", name = "note input", options = {"off", "on"}, default = 1}
 
-  params:add_group("x layer",13)
+  params:add_group("x layer",15)
   params:add{type = "option", id = "xClock", name = "clock source", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 1}
   params:add{type = "option", id = "xResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
   params:add{type = "option", id = "xStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=1}
@@ -108,6 +108,8 @@ function init()
   params:add{type = "number", id = "midiVelX", name = "midi velocity", min = 1, max = 127, default = 100}
   params:add{type = "number", id = "xMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add{type = "option", id = "xMidiOverlap", name = "midi glide mode", options = {"off", "overlap", "tie"}, default = 1}
+  params:add{type = "option", id = "xCrowGlide", name = "crow glide mode", options = {"glide", "tie"}, default = 1}
+  params:add{type = "option", id = "xCrowTie", name = "crow tie mode", options = {"with pitch", "with pitch and slew", "without pitch"}, default = 1}
   params:add_separator("xClockDiv", "clock division")
   params:add{type = "number", id = "xClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:set_action("xClockNum", function() saveData() end)
@@ -118,7 +120,7 @@ function init()
   params:set_action("xSnake", function(x) snake[1] = x; saveData(); grid_redraw(); redraw() end)
 
 
-  params:add_group("y layer",13)
+  params:add_group("y layer",15)
   params:add{type = "option", id = "yClock", name = "clock", options = {"crow input 1", "crow input 2", "internal clock", "global clock"}, default = 2}
   params:add{type = "option", id = "yResetOnStart", name = "reset on start", options = {"off", "on"}, default = 1}
   params:add{type = "option", id = "yStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=3}
@@ -127,6 +129,8 @@ function init()
   params:add{type = "number", id = "midiVelY", name = "midi velocity", min = 1, max = 127, default = 100}
   params:add{type = "number", id = "yMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add{type = "option", id = "yMidiOverlap", name = "midi glide mode", options = {"off", "overlap", "tie"}, default = 1}
+  params:add{type = "option", id = "yCrowGlide", name = "crow glide mode", options = {"glide", "tie"}, default = 1}
+  params:add{type = "option", id = "yCrowTie", name = "crow tie mode", options = {"with pitch", "with pitch and slew", "without pitch"}, default = 1}
   params:add_separator("yClockDiv", "clock division")
   params:add{type = "number", id = "yClockNum", name = "numerator", min = 1, max = 8, default = 1}
   params:set_action("yClockNum", function() saveData() end)
@@ -137,13 +141,15 @@ function init()
   params:set_action("ySnake", function(x) snake[2] = x; saveData(); grid_redraw(); redraw() end)
 
 
-  params:add_group("c layer",6)
+  params:add_group("c layer",8)
   params:add{type = "option", id = "cStep", name = "step", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
   params:add{type = "option", id = "cGate", name = "gate", options = {"crow output 1", "crow output 2", "crow output 3", "crow output 4", "none"}, default=5}
   params:add{type = "number", id = "midiChanC", name = "midi channel", min = 1, max = 16, default = 3}
   params:add{type = "number", id = "midiVelC", name = "midi velocity", min = 1, max = 127, default = 100}
   params:add{type = "number", id = "cMidiOffset", name = "midi offset", min=-24, max = 55, default = 0}
   params:add{type = "option", id = "cMidiOverlap", name = "midi glide mode", options = {"off", "overlap", "tie"}, default = 1}
+  params:add{type = "option", id = "cCrowGlide", name = "crow glide mode", options = {"glide", "tie"}, default = 1}
+  params:add{type = "option", id = "cCrowTie", name = "crow tie mode", options = {"with pitch", "with pitch and slew", "without pitch"}, default = 1}
 
   quant = {
     initTable(12, true),
@@ -324,15 +330,27 @@ function advance(inputNum, rising)
       end
     end
     if params:get("cStep") < 5 then
-      --glide
-      if (glide[3][step[3]]) then
+      local cCrowMode = params:get("cCrowGlide")
+      local cTieMode = params:get("cCrowTie")
+      if cCrowMode == 2 and glide[3][step[3]] and cTieMode == 3 then
+        -- tie without pitch: skip CV output entirely
+      elseif cCrowMode == 2 and glide[3][step[3]] and cTieMode == 2 then
+        -- tie with pitch and slew
         crow.output[params:get("cStep")].slew = SLEW_TIME
-      else
+        crow.output[params:get("cStep")].volts=(quantizedNotes[3][step[3]]/12)
+      elseif cCrowMode == 2 and glide[3][step[3]] and cTieMode == 1 then
+        -- tie with pitch, no slew
         crow.output[params:get("cStep")].slew = 0
+        crow.output[params:get("cStep")].volts=(quantizedNotes[3][step[3]]/12)
+      else
+        -- normal glide behavior
+        if (glide[3][step[3]]) then
+          crow.output[params:get("cStep")].slew = SLEW_TIME
+        else
+          crow.output[params:get("cStep")].slew = 0
+        end
+        crow.output[params:get("cStep")].volts=(quantizedNotes[3][step[3]]/12)
       end
-    
-      --note
-      crow.output[params:get("cStep")].volts=(quantizedNotes[3][step[3]]/12)
     end
     if params:get("cGate") < 5 then
       -- gate
@@ -384,15 +402,29 @@ function advance(inputNum, rising)
     end
     
     if stepOut < 5 then
-      --glide
-      if (glide[inputNum][step[inputNum]]) then
+      local xCrowParam = inputNum == 1 and "xCrowGlide" or "yCrowGlide"
+      local xTieParam = inputNum == 1 and "xCrowTie" or "yCrowTie"
+      local xCrowMode = params:get(xCrowParam)
+      local xTieMode = params:get(xTieParam)
+      if xCrowMode == 2 and glide[inputNum][step[inputNum]] and xTieMode == 3 then
+        -- tie without pitch: skip CV output entirely
+      elseif xCrowMode == 2 and glide[inputNum][step[inputNum]] and xTieMode == 2 then
+        -- tie with pitch and slew
         crow.output[stepOut].slew = SLEW_TIME
-      else
+        crow.output[stepOut].volts=(quantizedNotes[inputNum][step[inputNum]]/12)
+      elseif xCrowMode == 2 and glide[inputNum][step[inputNum]] and xTieMode == 1 then
+        -- tie with pitch, no slew
         crow.output[stepOut].slew = 0
+        crow.output[stepOut].volts=(quantizedNotes[inputNum][step[inputNum]]/12)
+      else
+        -- normal glide behavior
+        if (glide[inputNum][step[inputNum]]) then
+          crow.output[stepOut].slew = SLEW_TIME
+        else
+          crow.output[stepOut].slew = 0
+        end
+        crow.output[stepOut].volts=(quantizedNotes[inputNum][step[inputNum]]/12)
       end
-    
-      --note
-      crow.output[stepOut].volts=(quantizedNotes[inputNum][step[inputNum]]/12)
     end
     
     if gateOut < 5 then
@@ -434,10 +466,11 @@ function advance(inputNum, rising)
     end
 
   else
-    if gateOut < 5 then
+    local xCrowParam = inputNum == 1 and "xCrowGlide" or "yCrowGlide"
+    if gateOut < 5 and not (params:get(xCrowParam) == 2 and glide[inputNum][step[inputNum]]) then
       crow.output[gateOut].volts = 0
     end
-    if params:get("cGate") < 5 then
+    if params:get("cGate") < 5 and not (params:get("cCrowGlide") == 2 and glide[3][step[3]]) then
       crow.output[params:get("cGate")].volts = 0
       cGateOpen[inputNum] = false
     end
